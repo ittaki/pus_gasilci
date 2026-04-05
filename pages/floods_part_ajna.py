@@ -1,195 +1,103 @@
-import datetime as dt
 import requests
 import streamlit as st
-import xml.etree.ElementTree as ET
 
 
 REGIONS = {
     "Ljubljana": {
-        "station_candidates": ["LJUBLJANA_BEZIGRAD", "Ljubljana", "LJUBL-ANA_BEZIGRAD"],
-        "warning_zone": "SLOVENIA_CENTRAL",
+        "lat": 46.0569,
+        "lon": 14.5058,
         "map_query": "Ljubljana, Slovenia",
     },
     "Maribor": {
-        "station_candidates": ["MARIBOR", "Maribor"],
-        "warning_zone": "SLOVENIA_NORTH-EAST",
+        "lat": 46.5547,
+        "lon": 15.6459,
         "map_query": "Maribor, Slovenia",
     },
     "Celje": {
-        "station_candidates": ["CELJE", "Celje"],
-        "warning_zone": "SLOVENIA_NORTH-EAST",
+        "lat": 46.2397,
+        "lon": 15.2677,
         "map_query": "Celje, Slovenia",
     },
     "Kranj": {
-        "station_candidates": ["KRANJ", "Kranj"],
-        "warning_zone": "SLOVENIA_NORTH-WEST",
+        "lat": 46.2389,
+        "lon": 14.3556,
         "map_query": "Kranj, Slovenia",
     },
     "Koper": {
-        "station_candidates": ["KOPER", "Koper", "KOPER_MARKOVEC"],
-        "warning_zone": "SLOVENIA_SOUTH-WEST",
+        "lat": 45.5481,
+        "lon": 13.7302,
         "map_query": "Koper, Slovenia",
     },
     "Novo Mesto": {
-        "station_candidates": ["NOVO_MESTO", "Novo mesto", "NOVO MESTO"],
-        "warning_zone": "SLOVENIA_SOUTH-EAST",
+        "lat": 45.8030,
+        "lon": 15.1689,
         "map_query": "Novo Mesto, Slovenia",
     },
     "Murska Sobota": {
-        "station_candidates": ["MURSKA_SOBOTA", "Murska Sobota"],
-        "warning_zone": "SLOVENIA_NORTH-EAST",
+        "lat": 46.6625,
+        "lon": 16.1664,
         "map_query": "Murska Sobota, Slovenia",
     },
     "Nova Gorica": {
-        "station_candidates": ["NOVA_GORICA", "Nova Gorica"],
-        "warning_zone": "SLOVENIA_SOUTH-WEST",
+        "lat": 45.9560,
+        "lon": 13.6484,
         "map_query": "Nova Gorica, Slovenia",
     },
 }
 
-
-OBS_URL = "https://www.arso.gov.si/xml/vreme/podatki/dz_zadnji.xml"
-WARNING_OVERVIEW_URL = "https://meteo.arso.gov.si/met/sl/warning/"
-RADAR_URL = "https://meteo.arso.gov.si/met/sl/weather/observ/radar/"
-
-
-def safe_text(node, tag_names):
-    for tag in tag_names:
-        child = node.find(tag)
-        if child is not None and child.text and str(child.text).strip():
-            return str(child.text).strip()
-    return None
-
-
-def to_float_maybe(value):
-    if value is None:
-        return None
-    try:
-        return float(str(value).replace(",", "."))
-    except Exception:
-        return None
-
-
-@st.cache_data(ttl=600)
-def fetch_station_weather():
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(OBS_URL, headers=headers, timeout=20)
-    response.raise_for_status()
-    root = ET.fromstring(response.content)
-
-    stations = []
-    for station in root.findall(".//metPod"):
-        name = safe_text(station, ["domain_title", "title", "domain_longtitle", "valid_domain_title"])
-        if not name:
-            continue
-
-        stations.append(
-            {
-                "name": name,
-                "temp": safe_text(station, ["t", "temp", "ta"]),
-                "humidity": safe_text(station, ["rh", "humidity"]),
-                "wind": safe_text(station, ["ff_val", "ff", "wind_speed"]),
-                "condition": safe_text(station, ["nn_decode_short", "weather_desc", "wwsyn_shorttext"]),
-                "rain": safe_text(
-                    station,
-                    [
-                        "rr_val",
-                        "rr_10min",
-                        "rr_30min",
-                        "rr_1h",
-                        "precipitation",
-                        "padavine",
-                    ],
-                ),
-                "updated": safe_text(station, ["tsValid_issued", "valid", "updated"]),
-            }
-        )
-    return stations
-
-
-def match_station(region_name, stations):
-    candidates = REGIONS[region_name]["station_candidates"]
-    lowered = {c.lower() for c in candidates}
-
-    # Exact-ish match first
-    for station in stations:
-        station_name = station["name"].lower()
-        if station_name in lowered:
-            return station
-        if any(c.lower() in station_name for c in candidates):
-            return station
-
-    # Fallback to first candidate prefix/contains
-    for station in stations:
-        station_name = station["name"].lower()
-        if any(part.lower().replace("_", " ") in station_name for part in candidates):
-            return station
-
-    return None
+OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
 
 @st.cache_data(ttl=900)
-def fetch_warning(zone_code):
-    """
-    First-pass regional warning fetch.
-    ARSO warning filenames can vary by hazard and zone, so this function
-    tries the most useful rain-focused CAP files first and fails gracefully.
-    """
-    headers = {"User-Agent": "Mozilla/5.0"}
-    hazard_candidates = ["rain", "thunderstorm", "wind", "snow", "ice"]
-    base = "https://meteo.arso.gov.si/uploads/probase/www/warning/text/sl"
+def fetch_weather(lat: float, lon: float) -> dict:
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "current": [
+            "temperature_2m",
+            "relative_humidity_2m",
+            "wind_speed_10m",
+            "precipitation",
+            "rain",
+        ],
+        "hourly": ["precipitation"],
+        "forecast_days": 1,
+        "timezone": "auto",
+        "wind_speed_unit": "ms",
+        "precipitation_unit": "mm",
+    }
 
-    for hazard in hazard_candidates:
-        url = f"{base}/warning_{hazard}_{zone_code}_latest_CAP.xml"
-        try:
-            response = requests.get(url, headers=headers, timeout=15)
-            if response.status_code != 200 or not response.content:
-                continue
+    response = requests.get(OPEN_METEO_URL, params=params, timeout=20)
+    response.raise_for_status()
+    data = response.json()
 
-            root = ET.fromstring(response.content)
+    current = data.get("current", {})
+    hourly = data.get("hourly", {})
 
-            # CAP files commonly use namespaces. Strip them when needed.
-            def find_any_text(possible_names):
-                for elem in root.iter():
-                    tag = elem.tag.split("}")[-1]
-                    if tag in possible_names and elem.text and elem.text.strip():
-                        return elem.text.strip()
-                return None
+    rainfall_24h = None
+    precip_values = hourly.get("precipitation")
+    if isinstance(precip_values, list) and precip_values:
+        rainfall_24h = round(sum(v for v in precip_values if isinstance(v, (int, float))), 1)
 
-            headline = find_any_text(["headline"])
-            event = find_any_text(["event"])
-            severity = find_any_text(["severity"])
-            urgency = find_any_text(["urgency"])
-            description = find_any_text(["description"])
-            sent = find_any_text(["sent"])
-            area_desc = find_any_text(["areaDesc"])
-
-            if headline or event:
-                return {
-                    "headline": headline or event or "Weather warning",
-                    "event": event,
-                    "severity": severity,
-                    "urgency": urgency,
-                    "description": description,
-                    "sent": sent,
-                    "area_desc": area_desc,
-                    "source_url": url,
-                }
-        except Exception:
-            continue
-
-    return None
+    return {
+        "temperature": current.get("temperature_2m"),
+        "humidity": current.get("relative_humidity_2m"),
+        "wind": current.get("wind_speed_10m"),
+        "rain_now": current.get("rain", current.get("precipitation")),
+        "rainfall_24h": rainfall_24h,
+        "current_time": current.get("time"),
+    }
 
 
-def weather_warning_color(severity):
-    if not severity:
-        return "info"
-    sev = severity.lower()
-    if sev in {"extreme", "severe"}:
-        return "error"
-    if sev in {"moderate"}:
-        return "warning"
-    return "info"
+def warning_level(rain_now, rainfall_24h):
+    rain_now = rain_now or 0
+    rainfall_24h = rainfall_24h or 0
+
+    if rain_now >= 10 or rainfall_24h >= 60:
+        return "High", "error", "High rainfall intensity or accumulation detected."
+    if rain_now >= 4 or rainfall_24h >= 25:
+        return "Moderate", "warning", "Elevated rainfall conditions detected."
+    return "Low", "success", "No significant rainfall signal detected."
 
 
 def render():
@@ -392,39 +300,30 @@ def render():
     if mode is None:
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown(
-                """
+            st.markdown("""
                 <div class="mode-card landing-card">
                     <div class="small-label">Live operations</div>
                     <div class="big-text">Current Information</div>
                 </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            """, unsafe_allow_html=True)
         with c2:
-            st.markdown(
-                """
+            st.markdown("""
                 <div class="mode-card landing-card">
                     <div class="small-label">Archive workspace</div>
                     <div class="big-text">Archived Information</div>
                 </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            """, unsafe_allow_html=True)
 
         st.info("Choose a mode to continue.")
         return
 
     if mode == "Current Information":
-        st.markdown(
-            """
-            <div class="mode-card current-card">
-                <div class="small-label">Current mode</div>
-                <div class="big-text">Current flood monitoring and area-specific updates.</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown("""
+        <div class="mode-card current-card">
+            <div class="small-label">Current mode</div>
+            <div class="big-text">Current flood monitoring and area-specific updates.</div>
+        </div>
+        """, unsafe_allow_html=True)
 
         area = st.selectbox(
             "Select area",
@@ -439,129 +338,98 @@ def render():
             st.info("Select an area to continue.")
             return
 
-        region_cfg = REGIONS[area]
+        cfg = REGIONS[area]
 
-        # WEATHER / RAINFALL
-        weather_error = None
-        station = None
         try:
-            stations = fetch_station_weather()
-            station = match_station(area, stations)
+            weather = fetch_weather(cfg["lat"], cfg["lon"])
+            weather_error = None
         except Exception as exc:
+            weather = None
             weather_error = str(exc)
-
-        # WARNINGS
-        warning = None
-        warning_error = None
-        try:
-            warning = fetch_warning(region_cfg["warning_zone"])
-        except Exception as exc:
-            warning_error = str(exc)
 
         st.success(f"Area selected: {area}")
 
-        # TOP METRICS
         m1, m2, m3, m4 = st.columns(4)
 
-        if station:
-            with m1:
-                st.metric("Temperature", f"{station['temp'] or '—'} °C")
-            with m2:
-                st.metric("Rainfall", f"{station['rain'] or '—'} mm")
-            with m3:
-                st.metric("Wind", f"{station['wind'] or '—'} m/s")
-            with m4:
-                st.metric("Humidity", f"{station['humidity'] or '—'} %")
+        if weather:
+            m1.metric(
+                "Temperature",
+                "—" if weather["temperature"] is None else f'{weather["temperature"]:.1f} °C'
+            )
+            m2.metric(
+                "Rainfall (24h)",
+                "—" if weather["rainfall_24h"] is None else f'{weather["rainfall_24h"]:.1f} mm'
+            )
+            m3.metric(
+                "Wind",
+                "—" if weather["wind"] is None else f'{weather["wind"]:.1f} m/s'
+            )
+            m4.metric(
+                "Humidity",
+                "—" if weather["humidity"] is None else f'{weather["humidity"]:.0f} %'
+            )
         else:
-            with m1:
-                st.metric("Temperature", "—")
-            with m2:
-                st.metric("Rainfall", "—")
-            with m3:
-                st.metric("Wind", "—")
-            with m4:
-                st.metric("Humidity", "—")
-
-        st.markdown("")
+            m1.metric("Temperature", "—")
+            m2.metric("Rainfall (24h)", "—")
+            m3.metric("Wind", "—")
+            m4.metric("Humidity", "—")
 
         left, right = st.columns([1, 1])
 
         with left:
-            st.markdown(
-                """
-                <div class="mode-card current-card">
-                    <div class="small-label">Current weather</div>
-                    <div class="big-text">Station-based conditions</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.markdown("""
+            <div class="mode-card current-card">
+                <div class="small-label">Current weather</div>
+                <div class="big-text">Live regional conditions</div>
+            </div>
+            """, unsafe_allow_html=True)
 
             if weather_error:
-                st.error(f"Could not load ARSO weather data: {weather_error}")
-            elif station:
-                st.write(f"**Station:** {station['name']}")
-                st.write(f"**Condition:** {station['condition'] or '—'}")
-                st.write(f"**Updated:** {station['updated'] or '—'}")
-                st.write(f"**Rainfall:** {station['rain'] or '—'} mm")
+                st.error(f"Could not load live weather data: {weather_error}")
+            elif weather:
+                st.write(f"**Location:** {area}")
+                st.write(f"**Current temperature:** {weather['temperature']:.1f} °C" if weather["temperature"] is not None else "**Current temperature:** —")
+                st.write(f"**Current rainfall:** {weather['rain_now']:.1f} mm" if weather["rain_now"] is not None else "**Current rainfall:** —")
+                st.write(f"**Updated:** {weather['current_time'] or '—'}")
             else:
-                st.warning("No matching ARSO station was found for this area in the current feed.")
+                st.warning("No weather data is available for this area right now.")
 
         with right:
-            st.markdown(
-                """
-                <div class="mode-card current-card">
-                    <div class="small-label">Weather warnings</div>
-                    <div class="big-text">Regional warning status</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.markdown("""
+            <div class="mode-card current-card">
+                <div class="small-label">Weather warnings</div>
+                <div class="big-text">Rainfall-based warning estimate</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            if warning:
-                sev = weather_warning_color(warning.get("severity"))
-                text = warning.get("headline") or "Weather warning"
-                if sev == "error":
-                    st.error(text)
-                elif sev == "warning":
-                    st.warning(text)
+            if weather:
+                level, box_type, message = warning_level(weather["rain_now"], weather["rainfall_24h"])
+                if box_type == "error":
+                    st.error(f"{level} warning")
+                elif box_type == "warning":
+                    st.warning(f"{level} warning")
                 else:
-                    st.info(text)
+                    st.success(f"{level} warning")
 
-                if warning.get("event"):
-                    st.write(f"**Event:** {warning['event']}")
-                if warning.get("severity"):
-                    st.write(f"**Severity:** {warning['severity']}")
-                if warning.get("urgency"):
-                    st.write(f"**Urgency:** {warning['urgency']}")
-                if warning.get("area_desc"):
-                    st.write(f"**Area:** {warning['area_desc']}")
-                if warning.get("sent"):
-                    st.write(f"**Issued:** {warning['sent']}")
-                if warning.get("description"):
-                    st.write(warning["description"])
+                st.write(message)
+                st.write(f"**Current rainfall:** {weather['rain_now'] if weather['rain_now'] is not None else '—'} mm")
+                st.write(f"**24h rainfall:** {weather['rainfall_24h'] if weather['rainfall_24h'] is not None else '—'} mm")
             else:
-                st.info("No regional CAP warning was found in the first-pass feed lookup.")
-                st.link_button("Open ARSO warning overview", WARNING_OVERVIEW_URL)
-
-            if warning_error:
-                st.caption(f"Warning feed note: {warning_error}")
+                st.info("Warning estimate unavailable because live weather data could not be loaded.")
 
         st.markdown("---")
 
         map_col, rain_col = st.columns([1.2, 0.8])
 
         with map_col:
-            st.markdown(
-                """
-                <div class="mode-card current-card">
-                    <div class="small-label">Area overview</div>
-                    <div class="big-text">Region map</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            query = region_cfg["map_query"].replace(" ", "+")
+            st.markdown("""
+            <div class="mode-card current-card">
+                <div class="small-label">Area overview</div>
+                <div class="big-text">Region map</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            query = cfg["map_query"].replace(" ", "+")
             st.components.v1.iframe(
                 f"https://www.google.com/maps?q={query}&output=embed",
                 height=420,
@@ -569,41 +437,36 @@ def render():
             )
 
         with rain_col:
-            st.markdown(
-                """
-                <div class="mode-card current-card">
-                    <div class="small-label">Rainfall resources</div>
-                    <div class="big-text">ARSO precipitation view</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.markdown("""
+            <div class="mode-card current-card">
+                <div class="small-label">Rainfall summary</div>
+                <div class="big-text">Area precipitation status</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            if station:
-                rain_num = to_float_maybe(station["rain"])
-                if rain_num is not None:
-                    if rain_num >= 10:
-                        st.error(f"High station rainfall: {station['rain']} mm")
-                    elif rain_num >= 2:
-                        st.warning(f"Moderate station rainfall: {station['rain']} mm")
-                    else:
-                        st.success(f"Low station rainfall: {station['rain']} mm")
+            if weather:
+                rain_now = weather["rain_now"] if weather["rain_now"] is not None else 0
+                rain_24h = weather["rainfall_24h"] if weather["rainfall_24h"] is not None else 0
+
+                if rain_now >= 10 or rain_24h >= 60:
+                    st.error("High precipitation signal")
+                elif rain_now >= 4 or rain_24h >= 25:
+                    st.warning("Moderate precipitation signal")
                 else:
-                    st.info(f"Station rainfall: {station['rain'] or '—'} mm")
+                    st.success("Low precipitation signal")
 
-            st.link_button("Open ARSO radar precipitation", RADAR_URL)
-            st.caption("Use radar for broader precipitation context; station rainfall remains the local metric.")
+                st.write(f"**Current rainfall:** {rain_now} mm")
+                st.write(f"**Rainfall in the next/selected 24h window:** {rain_24h} mm")
+            else:
+                st.info("Rainfall summary unavailable.")
 
     elif mode == "Archived Information":
-        st.markdown(
-            """
-            <div class="mode-card history-card">
-                <div class="small-label">Archived mode</div>
-                <div class="big-text">Archive of past events, documents, reports, maps, and historical resources.</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown("""
+        <div class="mode-card history-card">
+            <div class="small-label">Archived mode</div>
+            <div class="big-text">Archive of past events, documents, reports, maps, and historical resources.</div>
+        </div>
+        """, unsafe_allow_html=True)
 
         history_type = st.selectbox(
             "Select archive type",
@@ -629,25 +492,20 @@ def render():
         c1, c2 = st.columns([1, 1])
 
         with c1:
-            st.markdown(
-                """
-                <div class="mode-card history-card">
-                    <div class="small-label">Archived workspace</div>
-                    <div class="big-text">Archived information view</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.markdown("""
+            <div class="mode-card history-card">
+                <div class="small-label">Archived workspace</div>
+                <div class="big-text">Archived information view</div>
+            </div>
+            """, unsafe_allow_html=True)
 
         with c2:
-            st.markdown(
-                """
-                <div class="mode-card history-card">
-                    <div class="small-label">Selected archive</div>
-                    <div class="big-text">Resource category</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.markdown("""
+            <div class="mode-card history-card">
+                <div class="small-label">Selected archive</div>
+                <div class="big-text">Resource category</div>
+            </div>
+            """, unsafe_allow_html=True)
+
             st.write(f"Selected archive type: **{history_type}**")
             st.write("Placeholder: archived resources will appear here.")
