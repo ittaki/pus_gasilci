@@ -10,12 +10,12 @@ def render():
     if mode == "Archived Information":
         page_background = """
         .stApp {
-            background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+            background: linear-gradient(180deg, #6082B6 0%, #4f6fa3 100%);
         }
         """
         title_color = "#f8fafc"
-        subtitle_color = "#cbd5e1"
-        divider_color = "rgba(148, 163, 184, 0.18)"
+        subtitle_color = "#e2e8f0"
+        divider_color = "rgba(255, 255, 255, 0.18)"
     else:
         page_background = """
         .stApp {
@@ -52,28 +52,28 @@ def render():
         .mode-card {{
             border-radius: 18px;
             padding: 22px;
-            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-            border: 1px solid rgba(148, 163, 184, 0.18);
             margin-bottom: 12px;
         }}
 
         .landing-card {{
-            background: rgba(255, 255, 255, 0.55);
+            background: rgba(255, 255, 255, 0.45);
             backdrop-filter: blur(6px);
             border: 1px solid rgba(191, 219, 254, 0.75);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
         }}
 
         .current-card {{
-            background: #ffffff;
+            background: rgba(255, 255, 255, 0.88);
             border: 1px solid #e2e8f0;
             box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
         }}
 
         .history-card {{
-            background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
-            border: 1px solid #334155;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             color: #f8fafc;
-            box-shadow: 0 10px 30px rgba(2, 6, 23, 0.35);
+            backdrop-filter: blur(6px);
+            box-shadow: 0 10px 30px rgba(31, 41, 55, 0.18);
         }}
 
         .small-label {{
@@ -86,7 +86,7 @@ def render():
         }}
 
         .history-card .small-label {{
-            color: #94a3b8;
+            color: #e2e8f0;
         }}
 
         .big-text {{
@@ -100,21 +100,12 @@ def render():
             color: #f8fafc;
         }}
 
-        .body-text {{
-            color: #334155;
-            line-height: 1.6;
-        }}
-
-        .history-card .body-text {{
-            color: #cbd5e1;
-        }}
-
         .wave-wrap {{
             position: relative;
             overflow: hidden;
             border-radius: 24px;
             padding: 28px;
-            background: linear-gradient(135deg, rgba(255,255,255,0.55) 0%, rgba(224,242,254,0.55) 100%);
+            background: linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(224,242,254,0.45) 100%);
             border: 1px solid rgba(191, 219, 254, 0.9);
             box-shadow: 0 12px 32px rgba(14, 116, 144, 0.08);
             margin-bottom: 20px;
