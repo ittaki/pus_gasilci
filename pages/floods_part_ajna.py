@@ -5,103 +5,123 @@ def render():
     if "floods_mode" not in st.session_state:
         st.session_state.floods_mode = None
 
-    st.markdown("""
-    <style>
-        .stApp {
-            background: linear-gradient(180deg, #f8fbff 0%, #eef6fb 100%);
-        }
+    mode = st.session_state.floods_mode
 
-        .block-container {
+    if mode == "Archived Information":
+        page_background = """
+        .stApp {
+            background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+        }
+        """
+        title_color = "#f8fafc"
+        subtitle_color = "#cbd5e1"
+        divider_color = "rgba(148, 163, 184, 0.18)"
+    else:
+        page_background = """
+        .stApp {
+            background: linear-gradient(180deg, #eaf4fb 0%, #dfeef8 100%);
+        }
+        """
+        title_color = "#0f172a"
+        subtitle_color = "#475569"
+        divider_color = "rgba(148, 163, 184, 0.22)"
+
+    st.markdown(f"""
+    <style>
+        {page_background}
+
+        .block-container {{
             padding-top: 2rem;
             padding-bottom: 2rem;
             max-width: 1200px;
-        }
+        }}
 
-        .main-title {
+        .main-title {{
             font-size: 2.6rem;
             font-weight: 800;
-            color: #0f172a;
+            color: {title_color};
             margin-bottom: 0.25rem;
-        }
+        }}
 
-        .subtitle {
-            color: #475569;
+        .subtitle {{
+            color: {subtitle_color};
             font-size: 1rem;
             margin-bottom: 1.5rem;
-        }
+        }}
 
-        .mode-card {
+        .mode-card {{
             border-radius: 18px;
             padding: 22px;
             box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
             border: 1px solid rgba(148, 163, 184, 0.18);
             margin-bottom: 12px;
-        }
+        }}
 
-        .landing-card {
-            background: rgba(255, 255, 255, 0.72);
+        .landing-card {{
+            background: rgba(255, 255, 255, 0.55);
             backdrop-filter: blur(6px);
-        }
+            border: 1px solid rgba(191, 219, 254, 0.75);
+        }}
 
-        .current-card {
+        .current-card {{
             background: #ffffff;
             border: 1px solid #e2e8f0;
             box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-        }
+        }}
 
-        .history-card {
+        .history-card {{
             background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
             border: 1px solid #334155;
             color: #f8fafc;
             box-shadow: 0 10px 30px rgba(2, 6, 23, 0.35);
-        }
+        }}
 
-        .small-label {
+        .small-label {{
             font-size: 0.78rem;
             text-transform: uppercase;
             letter-spacing: 0.08em;
             color: #64748b;
             margin-bottom: 8px;
             font-weight: 700;
-        }
+        }}
 
-        .history-card .small-label {
+        .history-card .small-label {{
             color: #94a3b8;
-        }
+        }}
 
-        .big-text {
+        .big-text {{
             font-size: 1.25rem;
             font-weight: 800;
             color: #0f172a;
             margin-bottom: 8px;
-        }
+        }}
 
-        .history-card .big-text {
+        .history-card .big-text {{
             color: #f8fafc;
-        }
+        }}
 
-        .body-text {
+        .body-text {{
             color: #334155;
             line-height: 1.6;
-        }
+        }}
 
-        .history-card .body-text {
+        .history-card .body-text {{
             color: #cbd5e1;
-        }
+        }}
 
-        .wave-wrap {
+        .wave-wrap {{
             position: relative;
             overflow: hidden;
             border-radius: 24px;
             padding: 28px;
-            background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(239,246,255,0.92) 100%);
-            border: 1px solid rgba(191, 219, 254, 0.8);
+            background: linear-gradient(135deg, rgba(255,255,255,0.55) 0%, rgba(224,242,254,0.55) 100%);
+            border: 1px solid rgba(191, 219, 254, 0.9);
             box-shadow: 0 12px 32px rgba(14, 116, 144, 0.08);
             margin-bottom: 20px;
-        }
+        }}
 
         .wave-wrap::before,
-        .wave-wrap::after {
+        .wave-wrap::after {{
             content: "";
             position: absolute;
             left: -10%;
@@ -109,31 +129,31 @@ def render():
             height: 140px;
             border-radius: 45%;
             background: rgba(56, 189, 248, 0.12);
-        }
+        }}
 
-        .wave-wrap::before {
+        .wave-wrap::before {{
             bottom: -70px;
-        }
+        }}
 
-        .wave-wrap::after {
+        .wave-wrap::after {{
             bottom: -95px;
             background: rgba(14, 165, 233, 0.08);
-        }
+        }}
 
-        div[data-testid="stButton"] > button {
+        div[data-testid="stButton"] > button {{
             border-radius: 14px;
             height: 3.2rem;
             font-weight: 700;
             border: 1px solid #dbeafe;
-        }
+        }}
 
-        div[data-testid="stSelectbox"] > div {
+        div[data-testid="stSelectbox"] > div {{
             border-radius: 12px;
-        }
+        }}
 
-        .section-spacer {
-            height: 8px;
-        }
+        hr {{
+            border-color: {divider_color};
+        }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -151,10 +171,12 @@ def render():
     with col1:
         if st.button("📡 Current Information", use_container_width=True):
             st.session_state.floods_mode = "Current Information"
+            st.rerun()
 
     with col2:
-        if st.button("🗂️ Historical Information", use_container_width=True):
-            st.session_state.floods_mode = "Historical Information"
+        if st.button("🗂️ Archived Information", use_container_width=True):
+            st.session_state.floods_mode = "Archived Information"
+            st.rerun()
 
     mode = st.session_state.floods_mode
 
@@ -168,9 +190,6 @@ def render():
             <div class="mode-card landing-card">
                 <div class="small-label">Live operations</div>
                 <div class="big-text">Current Information</div>
-                <div class="body-text">
-                    Use this mode for real-time area-based monitoring, alerts, and operational awareness.
-                </div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -178,10 +197,7 @@ def render():
             st.markdown("""
             <div class="mode-card landing-card">
                 <div class="small-label">Archive workspace</div>
-                <div class="big-text">Historical Information</div>
-                <div class="body-text">
-                    Use this mode to browse past flood events, reports, maps, notes, and other archived resources.
-                </div>
+                <div class="big-text">Archived Information</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -191,10 +207,7 @@ def render():
         st.markdown("""
         <div class="mode-card current-card">
             <div class="small-label">Current mode</div>
-            <div class="big-text">Live operational information</div>
-            <div class="body-text">
-                Clean live workspace for current flood monitoring and area-specific updates.
-            </div>
+            <div class="big-text">Current flood monitoring and area-specific updates.</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -228,10 +241,6 @@ def render():
                 <div class="mode-card current-card">
                     <div class="small-label">Current alerts</div>
                     <div class="big-text">Live warnings and notices</div>
-                    <div class="body-text">
-                        This section will later display real-time flood alerts, weather warnings,
-                        emergency notices, and operational updates for the selected area.
-                    </div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -242,24 +251,17 @@ def render():
                 <div class="mode-card current-card">
                     <div class="small-label">Area overview</div>
                     <div class="big-text">Regional operational view</div>
-                    <div class="body-text">
-                        This section will later contain the map, water levels, rainfall,
-                        infrastructure status, and other live area-specific information.
-                    </div>
                 </div>
                 """, unsafe_allow_html=True)
 
                 st.write(f"Selected area: **{area}**")
                 st.write("Placeholder: map and metrics for this area will appear here.")
 
-    elif mode == "Historical Information":
+    elif mode == "Archived Information":
         st.markdown("""
         <div class="mode-card history-card">
-            <div class="small-label">Historical mode</div>
-            <div class="big-text">Archive and reference materials</div>
-            <div class="body-text">
-                Dark archive workspace for past events, documents, reports, maps, and historical resources.
-            </div>
+            <div class="small-label">Archived mode</div>
+            <div class="big-text">Archive of past events, documents, reports, maps, and historical resources.</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -288,12 +290,8 @@ def render():
             with col1:
                 st.markdown("""
                 <div class="mode-card history-card">
-                    <div class="small-label">Historical workspace</div>
+                    <div class="small-label">Archived workspace</div>
                     <div class="big-text">Archived information view</div>
-                    <div class="body-text">
-                        This section will later contain archived flood events, stored reports,
-                        historical maps, notes, and supporting materials.
-                    </div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -302,9 +300,6 @@ def render():
                 <div class="mode-card history-card">
                     <div class="small-label">Selected archive</div>
                     <div class="big-text">Resource category</div>
-                    <div class="body-text">
-                        Use this area to browse structured archive content for the selected category.
-                    </div>
                 </div>
                 """, unsafe_allow_html=True)
 
