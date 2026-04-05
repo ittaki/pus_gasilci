@@ -4,12 +4,12 @@ import datetime
 import requests
 import xml.etree.ElementTree as ET
 
-# 1. KONFIGURACIJA STRANI
-    st.set_page_config(
-        page_title="Gasilski Operativni Center",
-        page_icon="🚒",
-        layout="wide"
-    )
+st.set_page_config(
+    page_title="Gasilski Operativni Center",
+    page_icon="🚒",
+    layout="wide"
+)
+
 page = st.sidebar.selectbox(
     "Select page",
     ["Main", "Floods"]
