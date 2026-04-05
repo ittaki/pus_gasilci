@@ -1,49 +1,81 @@
 import streamlit as st
 
-st.set_page_config(page_title="Floods", layout="wide")
+st.set_page_config(page_title="Floods", page_icon="🌊", layout="wide")
 
-st.title("🌊 Flood Monitoring – Ajna")
-st.markdown("---")
-
-# --- TOP METRICS ---
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.metric("Water Level", "1.8 m", "+0.2 m")
-
-with col2:
-    st.metric("Rainfall (24h)", "42 mm", "+5 mm")
-
-with col3:
-    st.metric("Risk Level", "HIGH")
+st.title("🌊 Floods")
+st.caption("Operational floods workspace")
 
 st.markdown("---")
 
-# --- MAP / MAIN AREA ---
-col1, col2 = st.columns([2, 1])
+mode = st.radio(
+    "Select mode",
+    ["Current Information", "Historical Information"],
+    horizontal=True,
+)
 
-with col1:
-    st.subheader("📍 Flood Map")
-    st.components.v1.iframe(
-        "https://www.google.com/maps?q=Ljubljana&output=embed",
-        height=500
+st.markdown("---")
+
+if mode == "Current Information":
+    st.subheader("Current Information")
+
+    area = st.selectbox(
+        "Select area",
+        [
+            "Ljubljana",
+            "Maribor",
+            "Celje",
+            "Kranj",
+            "Koper",
+            "Novo Mesto",
+            "Murska Sobota",
+            "Nova Gorica",
+        ],
+        index=None,
+        placeholder="Choose an area",
     )
 
-with col2:
-    st.subheader("⚠️ Alerts")
-    st.warning("River Sava rising rapidly")
-    st.error("Flood risk in northern districts")
-    st.info("Evacuation readiness recommended")
+    st.markdown("---")
 
-st.markdown("---")
+    if area is None:
+        st.info("Select an area to continue.")
+    else:
+        st.success(f"Area selected: {area}")
 
-# --- NOTES / ACTIONS ---
-st.subheader("📋 Actions")
+        st.markdown("### Live area workspace")
+        st.write("This is where current flood information for the selected area will appear.")
 
-st.checkbox("Check drainage systems")
-st.checkbox("Deploy pumps")
-st.checkbox("Notify emergency teams")
+        col1, col2 = st.columns(2)
 
-st.markdown("---")
+        with col1:
+            st.markdown("#### Current alerts")
+            st.write("Placeholder for live warnings, flood notices, and emergency updates.")
 
-st.write("Data will later be connected to real flood monitoring systems.")
+        with col2:
+            st.markdown("#### Area overview")
+            st.write("Placeholder for map, water levels, weather, and operational status.")
+
+elif mode == "Historical Information":
+    st.subheader("Historical Information")
+
+    history_type = st.selectbox(
+        "Select archive type",
+        [
+            "Past flood events",
+            "Reports",
+            "Maps",
+            "Operational notes",
+            "Reference materials",
+        ],
+        index=None,
+        placeholder="Choose a historical category",
+    )
+
+    st.markdown("---")
+
+    if history_type is None:
+        st.info("Select a historical category to continue.")
+    else:
+        st.success(f"Archive selected: {history_type}")
+
+        st.markdown("### Historical workspace")
+        st.write("This is where archived flood information and reference resources will appear.")
