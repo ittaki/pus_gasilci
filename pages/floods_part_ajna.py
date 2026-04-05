@@ -14,8 +14,8 @@ def render():
         }
         """
         title_color = "#f8fafc"
-        subtitle_color = "#e2e8f0"
-        divider_color = "rgba(255, 255, 255, 0.18)"
+        subtitle_color = "#eef2ff"
+        divider_color = "rgba(255, 255, 255, 0.20)"
     else:
         page_background = """
         .stApp {
@@ -29,6 +29,10 @@ def render():
     st.markdown(f"""
     <style>
         {page_background}
+
+        html, body, [class*="css"] {{
+            font-family: "Inter", "Segoe UI", sans-serif;
+        }}
 
         .block-container {{
             padding-top: 2rem;
@@ -63,17 +67,17 @@ def render():
         }}
 
         .current-card {{
-            background: rgba(255, 255, 255, 0.88);
+            background: rgba(255, 255, 255, 0.90);
             border: 1px solid #e2e8f0;
             box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
         }}
 
         .history-card {{
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(15, 23, 42, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.18);
             color: #f8fafc;
-            backdrop-filter: blur(6px);
-            box-shadow: 0 10px 30px rgba(31, 41, 55, 0.18);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 12px 30px rgba(31, 41, 55, 0.22);
         }}
 
         .small-label {{
@@ -86,7 +90,8 @@ def render():
         }}
 
         .history-card .small-label {{
-            color: #e2e8f0;
+            color: #f1f5f9;
+            opacity: 0.88;
         }}
 
         .big-text {{
@@ -97,6 +102,15 @@ def render():
         }}
 
         .history-card .big-text {{
+            color: #ffffff;
+            font-size: 1.3rem;
+            font-weight: 800;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+        }}
+
+        .history-card p,
+        .history-card span,
+        .history-card div {{
             color: #f8fafc;
         }}
 
@@ -144,6 +158,14 @@ def render():
 
         hr {{
             border-color: {divider_color};
+        }}
+
+        [data-testid="stInfo"] {{
+            border-radius: 14px;
+        }}
+
+        [data-testid="stSuccess"] {{
+            border-radius: 14px;
         }}
     </style>
     """, unsafe_allow_html=True)
