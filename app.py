@@ -107,4 +107,4 @@ if page == "Main":
     st.subheader("ℹ️ Viri podatkov")
     st.write("Aplikacija združuje GURS (Prostorski portal), ARSO (Vremenske storitve) in OPSI/Promet.si (Stanje na cestah).")
 elif page == "Floods":
-    import pages.1_floods_part_ajna
+    import pages.floods_part_ajna
