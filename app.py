@@ -107,5 +107,5 @@ if page == "Main":
     st.subheader("ℹ️ Viri podatkov")
     st.write("Aplikacija združuje GURS (Prostorski portal), ARSO (Vremenske storitve) in OPSI/Promet.si (Stanje na cestah).")
 elif page == "Floods":
-    st.title("TEST PAGE")
-    st.write("If you see this, app.py is controlling the Floods page.")
+    from pages import floods_part_ajna
+    floods_part_ajna.render()
