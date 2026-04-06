@@ -109,3 +109,6 @@ if page == "Main":
 elif page == "Floods":
     from pages import floods_part_ajna
     floods_part_ajna.render()
+
+if __name__ == "__main__":
+    render()
