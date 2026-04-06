@@ -154,3 +154,5 @@ def render():
         f"https://www.google.com/maps?q={cfg['map']}&output=embed",
         height=400
     )
+if __name__== "__main__" :
+    render()
