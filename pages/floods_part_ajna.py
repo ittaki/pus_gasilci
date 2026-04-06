@@ -99,6 +99,12 @@ def fetch_weather(lat, lon):
 # -----------------------------
 @st.cache_data(ttl=86400)
 def fetch_rivers():
+    url = "https://www.arso.gov.si/xml/vode/hidro_podatki_dnevno_porocilo.xml"
+
+    response = requests.get(url, timeout=20)
+    response.raise_for_status()
+
+    return response.text
     response = requests.get(ARSO_RIVER_URL, timeout=30)
     response.raise_for_status()
 
@@ -274,11 +280,11 @@ def render():
         st.info("Warning estimate unavailable.")
 
     # ---------------- RIVERS
-    st.subheader("🌊 River Status")
+st.subheader("🔍 RAW XML (debug)")
 
-    river_error = None
-    stations = []
-    region_rivers = []
+xml_data = fetch_rivers()
+
+st.code(xml_data[:2000])
 
     try:
         stations = fetch_rivers()
