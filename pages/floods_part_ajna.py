@@ -2,7 +2,7 @@ import math
 import requests
 import streamlit as st
 import xml.etree.ElementTree as ET
-
+st.error("FLOODS PAGE UPDATED")
 
 REGIONS = {
     "Ljubljana": {
