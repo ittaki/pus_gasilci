@@ -1,5 +1,7 @@
+import math
 import requests
 import streamlit as st
+import xml.etree.ElementTree as ET
 
 
 REGIONS = {
@@ -46,6 +48,7 @@ REGIONS = {
 }
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+ARSO_HYDRO_URL = "https://www.arso.gov.si/xml/vode/hidro_podatki_dnevno_porocilo.xml"
 
 
 @st.cache_data(ttl=900)
@@ -98,6 +101,172 @@ def warning_level(rain_now, rainfall_24h):
     if rain_now >= 4 or rainfall_24h >= 25:
         return "Moderate", "warning", "Elevated rainfall conditions detected."
     return "Low", "success", "No significant rainfall signal detected."
+
+
+def safe_float(value):
+    if value is None:
+        return None
+    value = str(value).strip()
+    if value == "":
+        return None
+    try:
+        return float(value.replace(",", "."))
+    except ValueError:
+        return None
+
+
+def haversine_km(lat1, lon1, lat2, lon2):
+    r = 6371.0
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+
+    a = (
+        math.sin(dphi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    )
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def get_nearest_region(lat, lon):
+    nearest_name = None
+    nearest_distance = None
+
+    for region_name, cfg in REGIONS.items():
+        d = haversine_km(lat, lon, cfg["lat"], cfg["lon"])
+        if nearest_distance is None or d < nearest_distance:
+            nearest_distance = d
+            nearest_name = region_name
+
+    return nearest_name, nearest_distance
+
+
+@st.cache_data(ttl=3600)
+def fetch_arso_hydro_data():
+    response = requests.get(ARSO_HYDRO_URL, timeout=20)
+    response.raise_for_status()
+
+    root = ET.fromstring(response.content)
+    stations = []
+
+    for station in root.findall("postaja"):
+        lat = safe_float(station.attrib.get("wgs84_sirina"))
+        lon = safe_float(station.attrib.get("wgs84_dolzina"))
+
+        region = None
+        distance_km = None
+        if lat is not None and lon is not None:
+            region, distance_km = get_nearest_region(lat, lon)
+
+        stations.append(
+            {
+                "sifra": station.attrib.get("sifra"),
+                "river": (station.findtext("reka") or "").strip(),
+                "place": (station.findtext("merilno_mesto") or "").strip(),
+                "short_name": (station.findtext("ime_kratko") or "").strip(),
+                "date": (station.findtext("datum") or "").strip(),
+                "date_cet": (station.findtext("datum_cet") or "").strip(),
+                "water_level": safe_float(station.findtext("vodostaj")),
+                "flow": safe_float(station.findtext("pretok")),
+                "water_temp": safe_float(station.findtext("temp_vode")),
+                "flow_characteristic": (station.findtext("pretok_znacilni") or "").strip(),
+                "flood_level_1": safe_float(station.findtext("prvi_vv_pretok")),
+                "flood_level_2": safe_float(station.findtext("drugi_vv_pretok")),
+                "flood_level_3": safe_float(station.findtext("tretji_vv_pretok")),
+                "lat": lat,
+                "lon": lon,
+                "region": region,
+                "distance_km": distance_km,
+            }
+        )
+
+    return stations
+
+
+def group_stations_by_region(stations):
+    grouped = {region: [] for region in REGIONS.keys()}
+    grouped["Unassigned"] = []
+
+    for station in stations:
+        region = station.get("region")
+        if region in grouped:
+            grouped[region].append(station)
+        else:
+            grouped["Unassigned"].append(station)
+
+    for region in grouped:
+        grouped[region] = sorted(
+            grouped[region],
+            key=lambda s: (
+                s["river"] or "",
+                s["place"] or "",
+                s["short_name"] or "",
+            )
+        )
+
+    return grouped
+
+
+def render_hydro_sources(selected_area=None):
+    st.markdown("""
+    <div class="mode-card current-card">
+        <div class="small-label">Hydrological sources</div>
+        <div class="big-text">ARSO measuring stations grouped by your regions</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    try:
+        stations = fetch_arso_hydro_data()
+    except Exception as exc:
+        st.error(f"Could not load ARSO hydrological XML: {exc}")
+        return
+
+    grouped = group_stations_by_region(stations)
+
+    if selected_area:
+        region_items = grouped.get(selected_area, [])
+        st.write(f"**Showing stations assigned to:** {selected_area}")
+
+        if not region_items:
+            st.info("No measuring stations found for this area.")
+            return
+
+        for s in region_items:
+            st.markdown(f"""
+**{s['short_name'] or 'Unnamed station'}**  
+River: **{s['river'] or '—'}**  
+Measuring place: **{s['place'] or '—'}**  
+Station code: **{s['sifra'] or '—'}**  
+Water level: **{s['water_level'] if s['water_level'] is not None else '—'}**  
+Flow: **{s['flow'] if s['flow'] is not None else '—'}**  
+Water temperature: **{s['water_temp'] if s['water_temp'] is not None else '—'}**  
+Flow characteristic: **{s['flow_characteristic'] or '—'}**  
+1st flood threshold flow: **{s['flood_level_1'] if s['flood_level_1'] is not None else '—'}**  
+2nd flood threshold flow: **{s['flood_level_2'] if s['flood_level_2'] is not None else '—'}**  
+3rd flood threshold flow: **{s['flood_level_3'] if s['flood_level_3'] is not None else '—'}**  
+Coordinates: **{s['lat'] if s['lat'] is not None else '—'}, {s['lon'] if s['lon'] is not None else '—'}**  
+Distance to {selected_area}: **{f"{s['distance_km']:.1f} km" if s['distance_km'] is not None else '—'}**  
+Updated: **{s['date'] or s['date_cet'] or '—'}**
+""")
+            st.markdown("---")
+    else:
+        for region, items in grouped.items():
+            if not items:
+                continue
+
+            with st.expander(f"{region} ({len(items)} stations)", expanded=False):
+                for s in items:
+                    st.markdown(f"""
+**{s['short_name'] or 'Unnamed station'}**  
+River: **{s['river'] or '—'}**  
+Measuring place: **{s['place'] or '—'}**  
+Water level: **{s['water_level'] if s['water_level'] is not None else '—'}**  
+Flow: **{s['flow'] if s['flow'] is not None else '—'}**  
+Water temperature: **{s['water_temp'] if s['water_temp'] is not None else '—'}**  
+Updated: **{s['date'] or s['date_cet'] or '—'}**
+""")
+                    st.markdown("---")
 
 
 def render():
@@ -460,6 +629,9 @@ def render():
             else:
                 st.info("Rainfall summary unavailable.")
 
+        st.markdown("---")
+        render_hydro_sources(area)
+
     elif mode == "Archived Information":
         st.markdown("""
         <div class="mode-card history-card">
@@ -508,4 +680,11 @@ def render():
             """, unsafe_allow_html=True)
 
             st.write(f"Selected archive type: **{history_type}**")
-            st.write("Placeholder: archived resources will appear here.")
+            st.write("Hydrological measuring stations grouped by your regions:")
+
+        st.markdown("---")
+        render_hydro_sources()
+
+
+if __name__ == "__main__":
+    render()
