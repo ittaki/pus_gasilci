@@ -25,7 +25,7 @@ def fetch_firms_data():
         if r.status_code != 200:
             return pd.DataFrame(), f"HTTP {r.status_code}"
         if "latitude" not in r.text:
-            return pd.DataFrame(), None  # nema požara, nije greška
+            return pd.DataFrame(), None
         from io import StringIO
         df = pd.read_csv(StringIO(r.text))
         return df, None
@@ -59,7 +59,7 @@ def render():
         st.error(f"Napaka pri nalaganju podatkov: {err}")
         return
 
-    # ── KPI metrike
+    # KPI metrike
     col1, col2, col3 = st.columns(3)
     col1.metric("Zaznani požari (48h)", len(df))
 
@@ -72,7 +72,7 @@ def render():
 
     st.divider()
 
-    # ── Folium mapa
+    # Folium mapa
     st.subheader("🗺️ Karta požarov")
     m = folium.Map(location=[46.1, 14.8], zoom_start=7, tiles="CartoDB positron")
 
@@ -115,7 +115,7 @@ def render():
     m.get_root().html.add_child(folium.Element(legend))
     st_folium(m, width="100%", height=500)
 
-    # ── Tabela
+    #Tabela
     if not df.empty:
         st.divider()
         st.subheader("📋 Podrobnosti")

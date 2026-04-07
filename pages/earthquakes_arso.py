@@ -29,10 +29,9 @@ def fetch_arso_table():
         if not table:
             return pd.DataFrame(), "Tabela ni bila najdena"
         rows = []
-        for tr in table.find_all("tr")[1:]:  # preskoči header
+        for tr in table.find_all("tr")[1:]: 
             cols = [td.get_text(strip=True) for td in tr.find_all("td")]
             if len(cols) >= 4:
-                # stolpci: datum, magnituda, intenziteta, lokacija, čutili
                 rows.append({
                     "Datum/čas": cols[0] if len(cols) > 0 else "",
                     "Mag.": cols[1] if len(cols) > 1 else "",
@@ -54,7 +53,7 @@ def fetch_usgs_map():
         quakes = []
         for f in data.get("features", []):
             p = f["properties"]
-            coords = f["geometry"]["coordinates"]  # [lon, lat, depth]
+            coords = f["geometry"]["coordinates"]
             quakes.append({
                 "lat": coords[1],
                 "lon": coords[0],
@@ -93,12 +92,12 @@ def render():
     #st.write(quakes)
 
 
-    # ── KPI metrike
+    #KPI metrike
     col1, col2, col3 = st.columns(3)
 
     if not df.empty:
         col1.metric("Potresi (30 dni)", len(df))
-        # filtriraj magnitude ≥ 2.0
+        #filtriraj magnitude ≥ 2.0
         strong = df[df["Mag."].apply(
             lambda x: float(x) >= 2.0 if x.replace(",", ".").replace(".", "").isdigit() else False
         )]
@@ -112,7 +111,7 @@ def render():
 
     st.divider()
 
-    # ── Folium mapa (USGS koordinate)
+    #Folium mapa (USGS koordinate)
     st.subheader("🗺️ Karta potresov")
     if err_usgs:
         st.warning(f"⚠️ Mapa: {err_usgs}")
@@ -149,10 +148,9 @@ def render():
 
     st.divider()
 
-    # ── ARSO tabela
+    # ARSO tabela
     st.subheader("📋 Zadnji potresi (ARSO)")
     if df.empty:
         st.info("Ni podatkov iz ARSO.")
     else:
-        # highlight redovi s mag ≥ 2.0
         st.dataframe(df, use_container_width=True, hide_index=True)
