@@ -7,12 +7,19 @@ import xml.etree.ElementTree as ET
 st.set_page_config(
     page_title="Gasilski Operativni Center",
     page_icon="🚒",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
+
+st.markdown("""
+    <style>
+        [data-testid="stSidebarNav"] {display: none;}
+    </style>
+""", unsafe_allow_html=True)
 
 page = st.sidebar.selectbox(
     "Select page",
-    ["Main", "Floods"]
+    ["Main", "Floods", "Earthquakes", "Fires"]
 )
 
 if page == "Main":
@@ -109,6 +116,16 @@ if page == "Main":
 elif page == "Floods":
     from pages import floods_part_ajna
     floods_part_ajna.render()
+elif page == "Earthquakes":
+    from pages import earthquakes_arso
+    earthquakes_arso.render()
+elif page == "Fires":
+    from pages import fires_firms
+    fires_firms.render()
 
-if __name__ == "__main__":
-    render()
+
+#if __name__ == "__main__":
+ #   from pages import floods_part_ajna
+  #  floods_part_ajna.render()
+
+
