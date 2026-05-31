@@ -1,156 +1,85 @@
 import streamlit as st
 import requests
-import pandas as pd
 import folium
 from streamlit_folium import st_folium
-from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timedelta
+import pandas as pd
 
-ARSO_URL = "https://potresi.arso.gov.si/"
-
-# USGS FDSN pokriva Slovenijo i vraća koordinate za mapu
-USGS_URL = (
-    "https://earthquake.usgs.gov/fdsnws/event/1/query"
-    "?format=geojson"
-    "&minlongitude=13.3&maxlongitude=17.0"
-    "&minlatitude=45.0&maxlatitude=47.5"
-    "&limit=50"
+EMSC_BASE = (
+    "https://www.seismicportal.eu/fdsnws/event/1/query"
+    "?format=json&limit=200"
+    "&minlat=45.0&maxlat=47.5&minlon=12.5&maxlon=17.5"
     "&minmagnitude=0.5"
-    "&orderby=time"
 )
 
-@st.cache_data(ttl=900)  # osvježi svaki 15 min
-def fetch_arso_table():
+@st.cache_data(ttl=900)
+def fetch_quakes(days=30):
     try:
-        r = requests.get(ARSO_URL, timeout=10)
-        r.encoding = "utf-8"
-        soup = BeautifulSoup(r.text, "html.parser")
-        table = soup.find("table")
-        if not table:
-            return pd.DataFrame(), "Tabela ni bila najdena"
+        start = (datetime.utcnow()-timedelta(days=days)).strftime("%Y-%m-%d")
+        r = requests.get(EMSC_BASE+f"&starttime={start}", timeout=20)
+        if r.status_code != 200:
+            return pd.DataFrame(), f"HTTP {r.status_code}"
+        feats = r.json().get("features",[])
         rows = []
-        for tr in table.find_all("tr")[1:]: 
-            cols = [td.get_text(strip=True) for td in tr.find_all("td")]
-            if len(cols) >= 4:
-                rows.append({
-                    "Datum/čas": cols[0] if len(cols) > 0 else "",
-                    "Mag.": cols[1] if len(cols) > 1 else "",
-                    "Int.": cols[2] if len(cols) > 2 else "",
-                    "Lokacija": cols[3] if len(cols) > 3 else "",
-                    "Čutili": cols[4] if len(cols) > 4 else "0",
-                })
-        return pd.DataFrame(rows), None
-    except requests.Timeout:
-        return pd.DataFrame(), "Timeout pri povezavi z ARSO"
+        for f in feats:
+            p = f["properties"]
+            c = f["geometry"]["coordinates"]
+            rows.append({"cas":p.get("time",""),"mag":p.get("mag"),
+                "globina_km":p.get("depth"),
+                "lokacija":p.get("flynn_region",p.get("place","")),
+                "lat":c[1],"lon":c[0]})
+        df = pd.DataFrame(rows)
+        if not df.empty:
+            df["cas"] = pd.to_datetime(df["cas"],errors="coerce")
+            df = df.sort_values("cas",ascending=False)
+        return df, None
     except Exception as e:
         return pd.DataFrame(), str(e)
 
-@st.cache_data(ttl=900)
-def fetch_usgs_map():
-    try:
-        r = requests.get(USGS_URL, timeout=30)
-        data = r.json()
-        quakes = []
-        for f in data.get("features", []):
-            p = f["properties"]
-            coords = f["geometry"]["coordinates"]
-            quakes.append({
-                "lat": coords[1],
-                "lon": coords[0],
-                "depth": coords[2],
-                "mag": p.get("mag", 0),
-                "place": p.get("place", ""),
-                "time": pd.to_datetime(p.get("time"), unit="ms").strftime("%d.%m.%Y %H:%M"),
-            })
-        return quakes, None
-    except requests.Timeout:
-        return [], "Timeout pri USGS"
-    except Exception as e:
-        return [], str(e)
-
 def mag_color(mag):
-    if mag is None:
-        return "gray"
-    try:
-        m = float(mag)
-    except (ValueError, TypeError):
-        return "gray"
-    if m >= 3.0:
-        return "red"
-    elif m >= 2.0:
-        return "orange"
-    else:
-        return "green"
+    try: m=float(mag)
+    except: return "gray"
+    if m>=4.0: return "red"
+    elif m>=2.5: return "orange"
+    else: return "green"
 
 def render():
-    st.title("🌍 Potresi ARSO")
-    st.caption(f"Vir: ARSO potresi (zadnjih 30 dni) · Posodobljeno: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
-
-    df, err_arso = fetch_arso_table()
-    quakes, err_usgs = fetch_usgs_map()
-
-    #st.write(quakes)
-
-
-    #KPI metrike
-    col1, col2, col3 = st.columns(3)
-
-    if not df.empty:
-        col1.metric("Potresi (30 dni)", len(df))
-        #filtriraj magnitude ≥ 2.0
-        strong = df[df["Mag."].apply(
-            lambda x: float(x) >= 2.0 if x.replace(",", ".").replace(".", "").isdigit() else False
-        )]
-        col2.metric("Mag. ≥ 2.0", len(strong))
-        col3.metric("Zadnji potres", df["Datum/čas"].iloc[0] if len(df) > 0 else "N/A")
-    else:
-        col1.metric("Potresi (30 dni)", "N/A")
-
-    if err_arso:
-        st.warning(f"⚠️ ARSO tabela: {err_arso}")
-
-    st.divider()
-
-    #Folium mapa (USGS koordinate)
-    st.subheader("🗺️ Karta potresov")
-    if err_usgs:
-        st.warning(f"⚠️ Mapa: {err_usgs}")
-    else:
-        m = folium.Map(location=[46.1, 14.8], zoom_start=8, tiles="CartoDB positron")
-        for q in quakes:
-            folium.CircleMarker(
-                location=[q["lat"], q["lon"]],
-                radius=max(4, float(q["mag"] or 0) * 3),
-                color=mag_color(q["mag"]),
-                #fill_color=mag_color(q["mag"]),
-                fill=True,
-                fill_opacity=0.7,
-                popup=folium.Popup(
-                    f"<b>Mag. {q['mag']}</b><br>"
-                    f"{q['place']}<br>"
-                    f"Globina: {q['depth']:.1f} km<br>"
-                    f"{q['time']}",
-                    max_width=220
-                ),
-                tooltip=f"Mag. {q['mag']} — {q['place']}"
-            ).add_to(m)
-
-        # legenda
-        legend = """
-        <div style="position:fixed;bottom:30px;left:30px;background:white;
-                    padding:10px;border-radius:8px;font-size:12px;z-index:1000;
-                    border:1px solid #ccc;">
-            <b>Magnituda</b><br>
-            🔴 ≥ 3.0 &nbsp; 🟠 ≥ 2.0 &nbsp; 🟢 &lt; 2.0
-        </div>"""
-        m.get_root().html.add_child(folium.Element(legend))
-        st_folium(m, width="100%", height=500)
-
-    st.divider()
-
-    # ARSO tabela
-    st.subheader("📋 Zadnji potresi (ARSO)")
+    st.title("Potresi - EMSC SeismicPortal")
+    st.caption(f"EMSC FDSN | Slovenija in okolica | {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+    days = st.slider("Obdobje (dni)", 7, 90, 30, 7)
+    with st.spinner("Nalagam..."):
+        df, err = fetch_quakes(days)
+    if err:
+        st.error(f"Napaka: {err}"); return
     if df.empty:
-        st.info("Ni podatkov iz ARSO.")
-    else:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.info("Ni potresov v tem obdobju."); return
+    c1,c2,c3 = st.columns(3)
+    c1.metric(f"Potresi ({days} dni)", len(df))
+    c2.metric("Mag >= 2.0", len(df[df["mag"]>=2.0]))
+    c3.metric("Zadnji potres", str(df.iloc[0]["cas"])[:16])
+    st.markdown("---")
+    st.subheader("Karta potresov")
+    m = folium.Map(location=[46.1,14.8], zoom_start=7, tiles="CartoDB positron")
+    for _, row in df.iterrows():
+        if pd.isna(row["lat"]) or pd.isna(row["lon"]): continue
+        color = mag_color(row["mag"])
+        radius = max(5, float(row["mag"] or 1)*3)
+        popup = (f"<b>Mag:</b> {row['mag']}<br>"
+                 f"<b>Cas:</b> {str(row['cas'])[:16]}<br>"
+                 f"<b>Globina:</b> {row['globina_km']} km<br>"
+                 f"<b>Lokacija:</b> {row['lokacija']}")
+        folium.CircleMarker(
+            location=[row["lat"],row["lon"]],
+            radius=radius, color=color, fill=True, fill_opacity=0.7,
+            popup=folium.Popup(popup,max_width=250),
+            tooltip=f"M{row['mag']} - {row['lokacija']}"
+        ).add_to(m)
+    st_folium(m, width=800, height=500)
+    st.subheader("Zadnji potresi")
+    show=[c for c in ["cas","mag","globina_km","lokacija","lat","lon"] if c in df.columns]
+    st.dataframe(df[show].head(50), use_container_width=True)
+    st.subheader("Magnitude skozi cas")
+    st.line_chart(df[["cas","mag"]].dropna().set_index("cas").sort_index())
+
+if __name__ == "__main__":
+    render()

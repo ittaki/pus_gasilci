@@ -19,13 +19,13 @@ st.markdown("""
 
 page = st.sidebar.selectbox(
     "Select page",
-    ["Main", "Floods", "Earthquakes", "Fires"]
+    ["Main","Nacrtovanje", "Floods", "Earthquakes", "Fires"]
 )
 
 if page == "Main":
     # FUNKCIJA ZA ARSO PODATKE
     def get_arso_data():
-        url = "https://www.arso.gov.si/xml/vreme/podatki/dz_zadnji.xml"
+        url = "https://www.arso.gov.si/xml/vreme/podatki/dz/zadnji.xml"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
@@ -84,12 +84,12 @@ if page == "Main":
     with col1:
         st.subheader("📍 GURS Interaktivna mapa")
         # Glavno okno za delo s parcelami in hidranti
-        st.components.v1.iframe("https://ipi.eprostor.gov.si/jv/", height=800, scrolling=True)
+        st.iframe("https://ipi.eprostor.gov.si/jv/", height=800)
     
     with col2:
         st.subheader("📈 ARSO Vremenska napoved")
         arso_lj_url = "https://vreme.arso.gov.si/napoved/Ljubljana/graf"
-        st.components.v1.iframe(arso_lj_url, height=400, scrolling=True)
+        st.iframe(arso_lj_url, height=400)
         
         st.divider()
     
@@ -100,7 +100,7 @@ if page == "Main":
         
         # Google Maps 
         google_traffic_url = "https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d44324.437651667!2d14.5058!3d46.0569!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1ssl!2ssi!4v1700000000000!5m2!1ssl!2ssi&layer=t"
-        st.components.v1.iframe(google_traffic_url, height=400)
+        st.iframe(google_traffic_url, height=400)
     
         st.divider()
         
@@ -122,10 +122,10 @@ elif page == "Earthquakes":
 elif page == "Fires":
     from pages import fires_firms
     fires_firms.render()
+elif page == "Nacrtovanje":
+    from pages import nacrtovanje
+    nacrtovanje.render()
 
 
-#if __name__ == "__main__":
- #   from pages import floods_part_ajna
-  #  floods_part_ajna.render()
 
 
